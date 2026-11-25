@@ -19,6 +19,7 @@ Stop accidentally summoning the Dock on your other monitor. Choose a display, br
 - **Stay out of the way.** One small menu bar icon, with no Dock icon or extra window.
 - **Pause in a click.** Restore normal edge access whenever you need it.
 - **Disconnect gracefully.** Protection pauses while your chosen display is absent and resumes when it returns.
+- **Start at login.** Enable automatic startup from the menu.
 - **Keep it local.** No network requests, accounts, analytics, or third-party dependencies.
 
 ## Get started
@@ -33,7 +34,7 @@ The menu shows **Dock protection active** when the mouse filter is running. The 
 
 Use **Pause** to reach the very bottom edge of another display; choose **Resume** when you're done.
 
-**Start at login:** add the app in **System Settings → General → Login Items**. The app does not enable this automatically.
+**Start at login:** choose **Start at Login** in the Dock Pin menu to launch the app automatically after signing in to macOS. Choose it again to disable automatic startup. The checkmark reflects the macOS setting. If approval is required, the menu shows **Start at Login (Approval Required)…** and opens Login Items in System Settings so you can approve or disable it. Automatic startup stays off until you enable it.
 
 ## How it works
 
@@ -48,7 +49,7 @@ The menu bar artwork is drawn as a native template image, so macOS renders it fo
 
 ### Privacy
 
-Accessibility permission is required to adjust pointer movement. Dock Pin handles movement and drag events; it does not subscribe to keyboard or click events, save pointer history, or send data anywhere. Only your selected display and pause preference are saved.
+Accessibility permission is required to adjust pointer movement. Dock Pin handles movement and drag events; it does not subscribe to keyboard or click events, save pointer history, or send data anywhere. Your selected display and pause preference are saved locally; macOS manages the optional login item.
 
 ## Limitations
 
@@ -80,10 +81,10 @@ This is an ad-hoc signed local build, not a notarized distribution. Rebuilding o
 
 ### Validation
 
-The build runs seven edge-policy checks covering the selected display, other displays, negative screen coordinates, interior movement, disconnected displays, vertical screen passage, and positions outside all displays. It also checks both menu icon states, decodes every app icon representation, and compares the small icons pixel by pixel against their source artwork. The bundle signature is verified after compilation.
+The build runs seven edge-policy checks covering the selected display, other displays, negative screen coordinates, interior movement, disconnected displays, vertical screen passage, and positions outside all displays. It also checks both menu icon states and all four login-item status indicators, decodes every app icon representation, and compares the small icons pixel by pixel against their source artwork. The bundle signature is verified after compilation.
 
 Real multi-display behavior still needs a hands-on check with Accessibility access granted: try Dock migration, pause/resume, dragging, sleep/wake, and reconnecting the selected display.
 
 ## Remove
 
-Choose **Quit Dock Pin**, remove it from Login Items if you added it, and delete the app. You can also remove its entry from Accessibility. No Dock or Spaces settings need to be restored.
+Turn off **Start at Login** if enabled (or remove Dock Pin in **System Settings → General → Login Items**), choose **Quit Dock Pin**, and delete the app. You can also remove its entry from Accessibility. No Dock or Spaces settings need to be restored.

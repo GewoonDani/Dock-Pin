@@ -1,5 +1,14 @@
 import AppKit
 import ApplicationServices
+import ServiceManagement
+
+func startAtLoginState(_ status: SMAppService.Status) -> NSControl.StateValue {
+    switch status {
+    case .enabled: return .on
+    case .requiresApproval: return .mixed
+    default: return .off
+    }
+}
 
 if CommandLine.arguments.contains("--self-test") {
     let a = DisplayArea(key: "a", bounds: CGRect(x: 0, y: 0, width: 100, height: 100))
@@ -22,6 +31,11 @@ if CommandLine.arguments.contains("--self-test") {
         assert(icon.tiffRepresentation != nil)
     }
     print("2 menu bar icon checks passed")
+    assert(startAtLoginState(.enabled) == .on)
+    assert(startAtLoginState(.requiresApproval) == .mixed)
+    assert(startAtLoginState(.notRegistered) == .off)
+    assert(startAtLoginState(.notFound) == .off)
+    print("4 start-at-login status checks passed")
     exit(0)
 }
 
@@ -115,6 +129,10 @@ final class DockPin: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         menu.addItem(.separator())
         add(menu, enabled ? "Pause" : "Resume", #selector(toggle))
+        let loginStatus = SMAppService.mainApp.status
+        let loginItem = menu.addItem(withTitle: loginStatus == .requiresApproval ? "Start at Login (Approval Required)…" : "Start at Login", action: #selector(toggleStartAtLogin), keyEquivalent: "")
+        loginItem.target = self
+        loginItem.state = startAtLoginState(loginStatus)
         add(menu, "Set Up Accessibility…", #selector(permissions))
         add(menu, "How It Works", #selector(help))
         menu.addItem(.separator())
@@ -144,6 +162,29 @@ final class DockPin: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+    }
+
+    @objc private func toggleStartAtLogin() {
+        let service = SMAppService.mainApp
+        do {
+            switch service.status {
+            case .enabled:
+                try service.unregister()
+            case .requiresApproval:
+                SMAppService.openSystemSettingsLoginItems()
+            default:
+                try service.register()
+                if service.status == .requiresApproval {
+                    SMAppService.openSystemSettingsLoginItems()
+                }
+            }
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Could not change Start at Login"
+            alert.informativeText = error.localizedDescription
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
     }
 
     @objc private func help() {
