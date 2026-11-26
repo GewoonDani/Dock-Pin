@@ -71,6 +71,10 @@ if CommandLine.arguments.contains("--self-test") {
         let icon = menuBarIcon(active: active)
         assert(icon.isTemplate && icon.size == NSSize(width: 22, height: 18))
         assert(icon.tiffRepresentation != nil)
+        let bitmap = NSBitmapImageRep(data: icon.tiffRepresentation!)!
+        assert(bitmap.colorAt(x: bitmap.pixelsWide * 9 / 22, y: bitmap.pixelsHigh * 10 / 18)!.alphaComponent > 0.9)
+        let lockAlpha = bitmap.colorAt(x: bitmap.pixelsWide * 19 / 22, y: bitmap.pixelsHigh * 6 / 18)!.alphaComponent
+        assert(active ? lockAlpha > 0.9 : lockAlpha == 0)
     }
     print("2 menu bar icon checks passed")
     assert(startAtLoginState(.enabled) == .on)

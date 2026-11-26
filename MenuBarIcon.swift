@@ -15,8 +15,8 @@ func menuBarIcon(active: Bool) -> NSImage {
         stand.lineCapStyle = .round
         stand.stroke()
         let dock = NSBezierPath(roundedRect: NSRect(x: 6, y: 7, width: 7, height: 2), xRadius: 1, yRadius: 1)
-        if active { dock.fill() }
-        else { dock.lineWidth = 0.75; dock.stroke() }
+        dock.fill()
+        guard active else { return true }
         // Clear the monitor behind the lock so the tiny silhouette stays readable.
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current?.compositingOperation = .clear
