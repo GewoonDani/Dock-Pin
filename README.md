@@ -24,13 +24,17 @@ Stop accidentally summoning the Dock on your other monitor. Choose a display to 
 
 ## Get started
 
+Download the latest Apple Silicon build from [GitHub Releases](https://github.com/GewoonDani/Dock-Pin/releases/latest), unzip it, and move **Dock Pin.app** to Applications. Quit any existing copy before replacing it. The download requires macOS 13 or later and does not support Intel Macs. It is ad-hoc signed and not notarized, so macOS Gatekeeper may block it.
+
+See the [changelog](CHANGELOG.md) for release history.
+
 1. Open **Dock Pin.app**. Keep the app in a permanent location before granting permissions.
 2. Click the **monitor-and-lock icon** in the menu bar and choose **Set Up Accessibility…**.
 3. In **System Settings → Privacy & Security → Accessibility**, add Dock Pin and enable access. Restart the app if macOS requires it.
 4. Choose your preferred display from the Dock Pin menu.
 5. Keep the Dock positioned at the **bottom**. While protection is active, choosing a display briefly sends the pointer to its bottom edge to bring the Dock there automatically.
 
-The menu shows **Dock protection active** when the mouse filter is running. The little Dock bar inside the menu icon is filled while active and outlined while inactive. The tooltip explains the current status.
+The menu shows **Dock protection active** when the mouse filter is running. The little Dock bar inside the menu icon is always filled. The padlock appears only while protection is active; it disappears when paused or otherwise inactive. The tooltip explains the current status.
 
 Use **Pause** to reach the very bottom edge of another display; choose **Resume** when you're done.
 
@@ -85,7 +89,7 @@ This is an ad-hoc signed local build, not a notarized distribution. Rebuilding o
 
 ### Validation
 
-The build runs eleven edge-policy checks covering the selected display, other displays, negative screen coordinates, interior movement, disconnected displays, vertical screen passage, positions outside all displays, and immediate upward escape after repeated fast downward movement. Nine Dock move checks cover exposed, covered, and partially covered bottom edges, missing displays, and generated movement and return events. These event checks require access to the macOS WindowServer. The build also checks both menu icon states and all four login-item status indicators, decodes every app icon representation, and compares the small icons pixel by pixel against their source artwork. The bundle signature is verified after compilation.
+The build runs eleven edge-policy checks covering the selected display, other displays, negative screen coordinates, interior movement, disconnected displays, vertical screen passage, positions outside all displays, and immediate upward escape after repeated fast downward movement. Nine Dock move checks cover exposed, covered, and partially covered bottom edges, missing displays, and generated movement and return events. These event checks require access to the macOS WindowServer. The build also checks both menu icon states, including the filled Dock and padlock visibility, and all four login-item status indicators, decodes every app icon representation, and compares the small icons pixel by pixel against their source artwork. The bundle signature is verified after compilation.
 
 Input safety checks verify that synthetic event sources permit all hardware input in both suppression states, clicks and keyboard events pass through unchanged, and both macOS filter shutdown notifications cancel automatic movement and leave protection inactive.
 
