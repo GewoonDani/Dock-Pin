@@ -81,7 +81,7 @@ This is an ad-hoc signed local build, not a notarized distribution. Rebuilding o
 
 ### Validation
 
-The build runs seven edge-policy checks covering the selected display, other displays, negative screen coordinates, interior movement, disconnected displays, vertical screen passage, and positions outside all displays. It also checks both menu icon states and all four login-item status indicators, decodes every app icon representation, and compares the small icons pixel by pixel against their source artwork. The bundle signature is verified after compilation.
+The build runs eleven edge-policy checks covering the selected display, other displays, negative screen coordinates, interior movement, disconnected displays, vertical screen passage, positions outside all displays, and immediate upward escape after repeated fast downward movement. It also checks both menu icon states and all four login-item status indicators, decodes every app icon representation, and compares the small icons pixel by pixel against their source artwork. The bundle signature is verified after compilation.
 
 Real multi-display behavior still needs a hands-on check with Accessibility access granted: try Dock migration, pause/resume, dragging, sleep/wake, and reconnecting the selected display.
 

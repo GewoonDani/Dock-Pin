@@ -14,17 +14,23 @@ if CommandLine.arguments.contains("--self-test") {
     let a = DisplayArea(key: "a", bounds: CGRect(x: 0, y: 0, width: 100, height: 100))
     let b = DisplayArea(key: "b", bounds: CGRect(x: -100, y: -50, width: 100, height: 150))
     let edge = CGPoint(x: -50, y: 99)
-    assert(guardedPoint(edge, displays: [a, b], selected: "a").y == 97)
-    assert(guardedPoint(edge, displays: [a, b], selected: "b") == edge)
-    assert(guardedPoint(edge, displays: [a, b], selected: "missing") == edge)
+    assert(guardedPoint(edge, deltaY: 1, displays: [a, b], selected: "a").y == 97)
+    assert(guardedPoint(edge, deltaY: 1, displays: [a, b], selected: "b") == edge)
+    assert(guardedPoint(edge, deltaY: 1, displays: [a, b], selected: "missing") == edge)
     let interior = CGPoint(x: -50, y: 90)
-    assert(guardedPoint(interior, displays: [a, b], selected: "a") == interior)
+    assert(guardedPoint(interior, deltaY: 1, displays: [a, b], selected: "a") == interior)
     let below = DisplayArea(key: "c", bounds: CGRect(x: -100, y: 100, width: 100, height: 100))
-    assert(guardedPoint(edge, displays: [a, b, below], selected: "a") == edge)
+    assert(guardedPoint(edge, deltaY: 1, displays: [a, b, below], selected: "a") == edge)
     let mainEdge = CGPoint(x: 50, y: 99)
-    assert(guardedPoint(mainEdge, displays: [a, b], selected: "a") == mainEdge)
-    assert(guardedPoint(CGPoint(x: 500, y: 500), displays: [a, b], selected: "a") == CGPoint(x: 500, y: 500))
-    print("7 edge-policy checks passed")
+    assert(guardedPoint(mainEdge, deltaY: 1, displays: [a, b], selected: "a") == mainEdge)
+    assert(guardedPoint(CGPoint(x: 500, y: 500), deltaY: 1, displays: [a, b], selected: "a") == CGPoint(x: 500, y: 500))
+    assert(guardedPoint(edge, deltaY: -1, displays: [a, b], selected: "a") == edge)
+    assert(guardedPoint(edge, deltaY: 0, displays: [a, b], selected: "a").y == 97)
+    for _ in 0..<1_000 {
+        assert(guardedPoint(edge, deltaY: 100, displays: [a, b], selected: "a").y == 97)
+    }
+    assert(guardedPoint(edge, deltaY: -1, displays: [a, b], selected: "a") == edge)
+    print("11 edge-policy checks passed (including 1,000 fast downward events followed by escape)")
     for active in [false, true] {
         let icon = menuBarIcon(active: active)
         assert(icon.isTemplate && icon.size == NSSize(width: 22, height: 18))
@@ -100,10 +106,9 @@ final class DockPin: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 return Unmanaged.passUnretained(event)
             }
             if owner.active {
-                let point = guardedPoint(event.location, displays: owner.displays, selected: owner.selected)
+                let point = guardedPoint(event.location, deltaY: event.getIntegerValueField(.mouseEventDeltaY), displays: owner.displays, selected: owner.selected)
                 if point != event.location {
-                    // shortcut: guard the bottom trigger zone; forced moves after wake need manual repositioning.
-                    CGWarpMouseCursorPosition(point)
+                    // Correct the event in place; a separate cursor warp can interfere with incoming movement.
                     event.location = point
                 }
             }

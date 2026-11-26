@@ -5,8 +5,10 @@ struct DisplayArea {
     let bounds: CGRect
 }
 
-func guardedPoint(_ point: CGPoint, displays: [DisplayArea], selected: String) -> CGPoint {
-    guard displays.contains(where: { $0.key == selected }),
+func guardedPoint(_ point: CGPoint, deltaY: Int64, displays: [DisplayArea], selected: String) -> CGPoint {
+    // Always let upward movement escape the edge, even if its location is still in the trigger zone.
+    guard deltaY >= 0,
+          displays.contains(where: { $0.key == selected }),
           let display = displays.first(where: { $0.bounds.contains(point) }),
           display.key != selected,
           point.y >= display.bounds.maxY - 2 else { return point }
