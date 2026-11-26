@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Remember a preferred Dock display per combination of connected screens, including the MacBook screen when active. Connection order and screen arrangement do not change the saved choice.
+- Restore known setups automatically after three seconds of stable screen layout on startup or display changes, using the existing cancelable pointer gesture. Opening the menu cancels a pending restore; unavailable edges are skipped silently.
+- Show whether the current setup has a saved display choice. New setups wait for a choice; the previous global preference is imported into the first matching setup.
+- Self-checks for setup preference migration, persistence, independent choices, connection order, and restore scheduling during layout changes and disconnects.
+
 ## 1.0.4 — 2026-11-26
 
 ### Added

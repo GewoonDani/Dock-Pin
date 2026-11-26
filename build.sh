@@ -9,9 +9,9 @@ for size in 16 32 128 256 512; do
 done
 swift -module-cache-path build/module-cache MakeIcon.swift
 rm -f "build/Dock Pin.app/Contents/Resources/AppIcon.icns" "build/Dock Pin.app/Contents/Resources/DockPinIcon.icns"
-swiftc -module-cache-path build/module-cache EdgePolicy.swift MenuBarIcon.swift main.swift -o build/DockPin-check
+swiftc -module-cache-path build/module-cache EdgePolicy.swift DisplayPreferences.swift MenuBarIcon.swift main.swift -o build/DockPin-check
 build/DockPin-check --self-test
-swiftc -O -module-cache-path build/module-cache EdgePolicy.swift MenuBarIcon.swift main.swift -o "build/Dock Pin.app/Contents/MacOS/DockPin"
+swiftc -O -module-cache-path build/module-cache EdgePolicy.swift DisplayPreferences.swift MenuBarIcon.swift main.swift -o "build/Dock Pin.app/Contents/MacOS/DockPin"
 cp Info.plist "build/Dock Pin.app/Contents/Info.plist"
 codesign --force --sign - "build/Dock Pin.app"
 codesign --verify --strict "build/Dock Pin.app"

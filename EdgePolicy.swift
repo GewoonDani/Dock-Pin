@@ -1,6 +1,6 @@
 import CoreGraphics
 
-struct DisplayArea {
+struct DisplayArea: Equatable {
     let key: String
     let bounds: CGRect
 }

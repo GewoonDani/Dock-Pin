@@ -67,6 +67,7 @@ if CommandLine.arguments.contains("--self-test") {
     assert(restore.getIntegerValueField(.eventSourceUserData) == dockMoveEventTag)
     print("9 Dock move checks passed")
     DockPin.checkInputSafety()
+    DockPin.checkDisplaySetups()
     for active in [false, true] {
         let icon = menuBarIcon(active: active)
         assert(icon.isTemplate && icon.size == NSSize(width: 22, height: 18))
@@ -91,13 +92,21 @@ final class DockPin: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var source: CFRunLoopSource?
     private var timer: Timer?
     private var dockMove: (timer: Timer, origin: CGPoint, source: CGEventSource)?
+    private var setupRestoreTimer: Timer?
+    private var observedLayout: [DisplayArea] = []
     private var displays: [DisplayArea] = []
     private var names: [String: String] = [:]
-    private var selected = UserDefaults.standard.string(forKey: "selectedDisplay") ?? ""
+    private let preferences: DisplayPreferences
+    private var selected = ""
     private var enabled = UserDefaults.standard.object(forKey: "enabled") as? Bool ?? true
     private var active = false
     private var tapFailed = false
     private var reason = ""
+
+    init(defaults: UserDefaults = .standard) {
+        preferences = DisplayPreferences(defaults: defaults)
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         status = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -119,14 +128,12 @@ final class DockPin: NSObject, NSApplicationDelegate, NSMenuDelegate {
             names[key] = screen.localizedName
             return DisplayArea(key: key, bounds: CGDisplayBounds(id))
         }
-        if selected.isEmpty, let first = displays.first {
-            selected = first.key
-            UserDefaults.standard.set(selected, forKey: "selectedDisplay")
-        }
+        updateDisplaySetup()
         if !enabled { reason = "Paused" }
         else if tapFailed { reason = "Mouse filter stopped for safety; restart Dock Pin" }
         else if !AXIsProcessTrusted() { reason = "Accessibility permission required" }
         else if displays.count < 2 { reason = "Only one display connected" }
+        else if selected.isEmpty { reason = "Choose a display for this setup" }
         else if !displays.contains(where: { $0.key == selected }) { reason = "Selected display disconnected" }
         else if (UserDefaults.standard.persistentDomain(forName: "com.apple.dock")?["orientation"] as? String ?? "bottom") != "bottom" { reason = "Move the Dock to the bottom first" }
         else { reason = "" }
@@ -137,6 +144,25 @@ final class DockPin: NSObject, NSApplicationDelegate, NSMenuDelegate {
         status.button?.image = menuBarIcon(active: active)
         status.button?.setAccessibilityLabel("Dock Pin")
         status.button?.toolTip = active ? "Dock Pin active: \(names[selected] ?? "display")" : "Dock Pin: \(reason)"
+    }
+
+    private func updateDisplaySetup() {
+        let layout = displays.sorted { $0.key < $1.key }
+        guard layout != observedLayout else { return }
+        stopDockMove(restore: false)
+        setupRestoreTimer?.invalidate()
+        setupRestoreTimer = nil
+        observedLayout = layout
+        selected = preferences.selection(for: displays)
+        guard !selected.isEmpty else { return }
+        // Docks can announce their screens separately; wait for the layout to settle.
+        setupRestoreTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: false) { [weak self] _ in
+            guard let self else { return }
+            self.refresh()
+            guard self.observedLayout == layout else { return }
+            self.setupRestoreTimer = nil
+            self.moveDockToSelectedDisplay(automatically: true)
+        }
     }
 
     private func installTap() {
@@ -211,13 +237,69 @@ final class DockPin: NSObject, NSApplicationDelegate, NSMenuDelegate {
         print("Input safety checks passed (suppression, click/key passthrough, and both tap shutdowns)")
     }
 
+    static func checkDisplaySetups() {
+        let suite = "DockPin-self-test-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let preferences = DisplayPreferences(defaults: defaults)
+        let laptop = DisplayArea(key: "laptop", bounds: CGRect(x: 0, y: 0, width: 100, height: 100))
+        let left = DisplayArea(key: "left", bounds: CGRect(x: -100, y: 0, width: 100, height: 100))
+        let right = DisplayArea(key: "right", bounds: CGRect(x: 100, y: 0, width: 100, height: 100))
+        let third = DisplayArea(key: "third", bounds: CGRect(x: 200, y: 0, width: 100, height: 100))
+        let home = [left, right, third]
+        let work = [laptop, left, right]
+        assert(preferences.selection(for: home).isEmpty)
+        assert(preferences.selection(for: []).isEmpty)
+        defaults.set("right", forKey: "selectedDisplay")
+        assert(preferences.selection(for: home) == "right")
+        assert(preferences.selection(for: work).isEmpty)
+        preferences.remember("laptop", for: work)
+        assert(preferences.selection(for: home.reversed()) == "right")
+        assert(preferences.selection(for: work) == "laptop")
+        preferences.remember("left", for: home)
+        preferences.remember("missing", for: work)
+        let reloaded = DisplayPreferences(defaults: UserDefaults(suiteName: suite)!)
+        assert(reloaded.selection(for: home) == "left")
+        assert(reloaded.selection(for: work) == "laptop")
+        assert(reloaded.selection(for: [left, right]).isEmpty)
+        assert(reloaded.selection(for: [laptop]).isEmpty)
+
+        let owner = DockPin(defaults: defaults)
+        owner.displays = home
+        owner.updateDisplaySetup()
+        assert(owner.selected == "left" && owner.setupRestoreTimer?.isValid == true)
+        let pendingHome = owner.setupRestoreTimer!
+        owner.displays = home.reversed()
+        owner.updateDisplaySetup()
+        assert(owner.setupRestoreTimer === pendingHome)
+        owner.displays = work
+        owner.updateDisplaySetup()
+        assert(!pendingHome.isValid && owner.selected == "laptop")
+        let pendingWork = owner.setupRestoreTimer!
+        owner.displays[0] = DisplayArea(key: "laptop", bounds: CGRect(x: 0, y: -100, width: 100, height: 100))
+        owner.updateDisplaySetup()
+        assert(!pendingWork.isValid && owner.selected == "laptop" && owner.setupRestoreTimer?.isValid == true)
+        let pendingRearrangement = owner.setupRestoreTimer!
+        owner.displays = [left, right]
+        owner.updateDisplaySetup()
+        assert(!pendingRearrangement.isValid && owner.setupRestoreTimer == nil && owner.selected.isEmpty)
+        owner.displays = []
+        owner.updateDisplaySetup()
+        assert(owner.selected.isEmpty && owner.setupRestoreTimer == nil)
+        print("Display setup checks passed (migration, independent choices, persistence, order, layout settling, and unknown/disconnected setups)")
+    }
+
     func menuWillOpen(_ menu: NSMenu) {
         stopDockMove(restore: true)
         refresh()
+        setupRestoreTimer?.invalidate()
+        setupRestoreTimer = nil
         menu.removeAllItems()
         let header = menu.addItem(withTitle: active ? "Dock protection active" : reason, action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(.separator())
+        let setup = menu.addItem(withTitle: selected.isEmpty ? "Choose a display for this setup" : "Display remembered for this setup", action: nil, keyEquivalent: "")
+        setup.isEnabled = false
         for (index, display) in displays.enumerated() {
             let item = menu.addItem(withTitle: "\(index + 1). \(names[display.key] ?? "Display")", action: #selector(selectDisplay(_:)), keyEquivalent: "")
             item.target = self
@@ -243,19 +325,28 @@ final class DockPin: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func selectDisplay(_ sender: NSMenuItem) {
         guard let key = sender.representedObject as? String else { return }
-        selected = key
-        UserDefaults.standard.set(key, forKey: "selectedDisplay")
         refresh()
+        guard displays.contains(where: { $0.key == key }) else { return }
+        setupRestoreTimer?.invalidate()
+        setupRestoreTimer = nil
+        selected = key
+        preferences.remember(key, for: displays)
+        refresh()
+        let layout = observedLayout
         DispatchQueue.main.async { [weak self] in
-            guard let self, self.selected == key else { return }
+            guard let self, self.selected == key, self.observedLayout == layout else { return }
             self.moveDockToSelectedDisplay()
         }
     }
 
-    private func moveDockToSelectedDisplay() {
+    private func moveDockToSelectedDisplay(automatically: Bool = false) {
         stopDockMove(restore: true)
-        guard active else { help(); return }
+        guard active else {
+            if !automatically { help() }
+            return
+        }
         guard let target = dockTriggerPoint(displays: displays, selected: selected) else {
+            guard !automatically else { return }
             let alert = NSAlert()
             alert.messageText = "This display has no free bottom edge"
             alert.informativeText = "Another display is directly below it. Adjust the display arrangement or choose another display."
@@ -299,6 +390,8 @@ final class DockPin: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func toggle() {
+        setupRestoreTimer?.invalidate()
+        setupRestoreTimer = nil
         enabled.toggle()
         UserDefaults.standard.set(enabled, forKey: "enabled")
         refresh()
@@ -336,7 +429,7 @@ final class DockPin: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func help() {
         let alert = NSAlert()
         alert.messageText = "Keep the Dock on \(names[selected] ?? "your selected display")"
-        alert.informativeText = "Position the Dock at the bottom. Grant Dock Pin access in Privacy & Security → Accessibility. Choose a display in the menu to bring the Dock there automatically while protection is active. The pointer briefly visits its bottom edge and returns; moving, clicking, or scrolling cancels this.\n\nDock Pin guards the bottom 2 points on other displays. Pause the app whenever you need to reach them.\n\nmacOS may still move the Dock after sleep or display changes. Choose your display again, or hold the pointer at its bottom edge until the Dock appears. Protection pauses automatically when the selected display is disconnected."
+        alert.informativeText = "Position the Dock at the bottom. Grant Dock Pin access in Privacy & Security → Accessibility. Choose a display once for each setup, such as home and work. Dock Pin remembers the choice for that combination of screens, including whether your MacBook screen is in use.\n\nWhen a known setup returns, Dock Pin waits for the screens to settle for 3 seconds, then brings the Dock to your saved display while protection is active. Opening this menu cancels a pending restore. The pointer briefly visits the bottom edge and returns; moving, clicking, or scrolling cancels the movement.\n\nDock Pin guards the bottom 2 points on other displays. Pause whenever you need to reach them. New setups need a display choice first. macOS may still move the Dock after sleep or a Dock restart; choose your display again to bring it back."
         NSApp.activate(ignoringOtherApps: true)
         alert.addButton(withTitle: "Got It")
         alert.runModal()
@@ -346,6 +439,7 @@ final class DockPin: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         stopDockMove(restore: true)
+        setupRestoreTimer?.invalidate()
         timer?.invalidate()
         if let tap { CFMachPortInvalidate(tap) }
         if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
